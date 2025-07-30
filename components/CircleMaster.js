@@ -107,7 +107,7 @@ export default function CircleMaster() {
     setIsLoadingLeaderboard(true);
     try {
       const { ethers } = await import("ethers");
-      const provider = new ethers.providers.JsonRpcProvider("https://mainnet.base.org");
+      const provider = new ethers.providers.JsonRpcProvider("https://base-rpc.publicnode.com");
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
       
       console.log("Loading leaderboard from contract:", CONTRACT_ADDRESS);
