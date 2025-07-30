@@ -121,63 +121,6 @@ export default function CircleMaster() {
       // Process events to build leaderboard
       const playerScores = {};
       
-      events.forEach(event => {
-        const { player, score } = event.args;
-        const scoreNum = score.toNumber();
-        
-        // Keep only the highest score for each player
-        if (!playerScores[player] || playerScores[player] < scoreNum) {
-          playerScores[player] = scoreNum;
-        }
-      });
-      
-      // Convert to array and sort
-      const leaderboard = Object.entries(playerScores)
-        .map(([address, score]) => ({
-          address,
-          score,
-          shortAddress: `${address.slice(0,6)}...${address.slice(-4)}`
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10)
-        .map((player, index) => ({ ...player, rank: index + 1 }));
-      
-      console.log("Processed leaderboard:", leaderboard);
-      setLeaderboardData(leaderboard);
-      
-    } catch (error) {
-      console.error("Error loading leaderboard:", error);
-      setLeaderboardData([]);
-    } finally {
-      setIsLoadingLeaderboard(false);
-    }
-  };
-      events.forEach(event => {
-        const { player, score } = event.args;
-        const scoreNum = score.toNumber();
-        if (!playerScores[player] || playerScores[player] < scoreNum) {
-          playerScores[player] = scoreNum;
-        }
-      });
-      
-      const leaderboard = Object.entries(playerScores)
-        .map(([address, score]) => ({
-          address,
-          score,
-          shortAddress: `${address.slice(0,6)}...${address.slice(-4)}`
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10)
-        .map((player, index) => ({ ...player, rank: index + 1 }));
-      
-      setLeaderboardData(leaderboard);
-    } catch (error) {
-      console.error("Error loading leaderboard:", error);
-      setLeaderboardData([]);
-    } finally {
-      setIsLoadingLeaderboard(false);
-    }
-  };
 
   const handleConnectWallet = async () => {
     setIsConnecting(true);
