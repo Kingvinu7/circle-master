@@ -102,6 +102,45 @@ export default function CircleMaster() {
   };
 
   // Enhanced wallet connection
+  // Load leaderboard from events
+  const loadLeaderboard = async () => {
+    setIsLoadingLeaderboard(true);
+    try {
+      const { ethers } = await import("ethers");
+      const provider = new ethers.providers.JsonRpcProvider("https://mainnet.base.org");
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      
+      const filter = contract.filters.ScoreSubmitted();
+      const events = await contract.queryFilter(filter, 0, "latest");
+      
+      const playerScores = {};
+      events.forEach(event => {
+        const { player, score } = event.args;
+        const scoreNum = score.toNumber();
+        if (!playerScores[player] || playerScores[player] < scoreNum) {
+          playerScores[player] = scoreNum;
+        }
+      });
+      
+      const leaderboard = Object.entries(playerScores)
+        .map(([address, score]) => ({
+          address,
+          score,
+          shortAddress: `${address.slice(0,6)}...${address.slice(-4)}`
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10)
+        .map((player, index) => ({ ...player, rank: index + 1 }));
+      
+      setLeaderboardData(leaderboard);
+    } catch (error) {
+      console.error("Error loading leaderboard:", error);
+      setLeaderboardData([]);
+    } finally {
+      setIsLoadingLeaderboard(false);
+    }
+  };
+
   const handleConnectWallet = async () => {
     setIsConnecting(true);
     try {
@@ -537,6 +576,72 @@ export default function CircleMaster() {
         </div>
 
         {/* Enhanced Web3 Section */}
+        {/* Leaderboard Modal */}
+        {showLeaderboard && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-white">🏆 Global Leaderboard</h2>
+                <button
+                  onClick={() => setShowLeaderboard(false)}
+                  className="text-white hover:text-red-300 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              
+              {isLoadingLeaderboard ? (
+                <div className="text-center text-white py-8">
+                  <div className="animate-spin text-2xl mb-2">⏳</div>
+                  Loading leaderboard...
+                </div>
+              ) : leaderboardData.length > 0 ? (
+                <div className="space-y-2">
+                  {leaderboardData.map((player, index) => (
+                    <div
+                      key={player.address}
+                      className={`flex items-center justify-between p-3 rounded-xl ${
+                        index === 0 ? "bg-yellow-500/20 border border-yellow-400/30" :
+                        index === 1 ? "bg-gray-400/20 border border-gray-300/30" :
+                        index === 2 ? "bg-orange-500/20 border border-orange-400/30" :
+                        "bg-white/10"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="text-xl">
+                          {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${player.rank}`}
+                        </span>
+                        <div>
+                          <p className="text-white font-semibold text-sm">
+                            {player.address === walletAddress ? "You" : player.shortAddress}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white font-bold">{player.score}</p>
+                        <p className="text-gray-300 text-xs">points</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-white py-8">
+                  <p>No scores yet!</p>
+                  <p className="text-sm text-gray-300 mt-2">Be the first to submit a score onchain!</p>
+                </div>
+              )}
+              
+              <button
+                onClick={loadLeaderboard}
+                disabled={isLoadingLeaderboard}
+                className="w-full mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 text-white rounded-xl transition-colors"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="web3-section mt-4 text-center max-w-lg w-full px-4">
           {!walletConnected ? (
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
