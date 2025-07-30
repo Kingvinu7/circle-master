@@ -16,9 +16,6 @@ export default function CircleMaster() {
   const [walletAddress, setWalletAddress] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [leaderboardData, setLeaderboardData] = useState([]);
-  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
   const [partyMode, setPartyMode] = useState(false);
 
   // Visual Effects Functions
