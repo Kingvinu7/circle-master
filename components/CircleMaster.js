@@ -1,7 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useAccount, useWriteContract, useReadContract } from 'wagmi'
-import { ConnectButton } from '@rainbow-me/rainbowkit'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../lib/web3Config'
+import { connectWallet, CONTRACT_ADDRESS } from '../lib/web3Config';
 
 export default function CircleMaster() {
   const canvasRef = useRef(null);
@@ -13,43 +11,30 @@ export default function CircleMaster() {
   const [bestScore, setBestScore] = useState(0);
   const [attempts, setAttempts] = useState(0);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-  
-  // Web3 hooks
-  const { address, isConnected } = useAccount()
-  const { writeContract, isPending } = useWriteContract()
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  // Read player stats from contract
-  const { data: playerStats } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getPlayerStats',
-    args: [address],
-    enabled: !!address && CONTRACT_ADDRESS !== "0x..."
-  })
-
-  // Submit score onchain
-  const submitScoreOnchain = async (score) => {
-    if (!isConnected || score < 70 || CONTRACT_ADDRESS === "0x...") return
-    
+  // Connect wallet function
+  const handleConnectWallet = async () => {
+    setIsConnecting(true);
     try {
-      await writeContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: 'submitScore',
-        args: [score]
-      })
+      const address = await connectWallet();
+      setWalletConnected(true);
+      setWalletAddress(address);
     } catch (error) {
-      console.error('Error submitting score:', error)
+      alert(error.message);
+    } finally {
+      setIsConnecting(false);
     }
-  }
-  
-  // Function to evaluate circle quality (balanced difficulty)
+  };
+
+  // Function to evaluate circle quality
   const evaluateCircle = (points) => {
     if (points.length < 10) {
       return { score: 0, message: "Draw a complete circle!" };
     }
 
-    // Calculate center using average of all points
     const center = points.reduce((acc, point) => ({
       x: acc.x + point.x,
       y: acc.y + point.y
@@ -58,7 +43,6 @@ export default function CircleMaster() {
     center.x /= points.length;
     center.y /= points.length;
 
-    // Calculate average radius and variance
     let avgRadius = 0;
     for (const point of points) {
       const distance = Math.sqrt(
@@ -79,7 +63,6 @@ export default function CircleMaster() {
     }
     radiusVariance = Math.sqrt(radiusVariance / points.length);
 
-    // Check if circle is closed
     const startPoint = points[0];
     const endPoint = points[points.length - 1];
     const closureDistance = Math.sqrt(
@@ -89,7 +72,6 @@ export default function CircleMaster() {
     const maxClosureDistance = avgRadius * 0.25;
     const isClosed = closureDistance < maxClosureDistance;
 
-    // Calculate score
     const maxVariance = avgRadius * 0.6;
     const varianceScore = Math.max(0, 1 - (radiusVariance / maxVariance));
     const closureScore = isClosed ? 1 : 0.6;
@@ -100,7 +82,6 @@ export default function CircleMaster() {
     if (totalScore > 40) totalScore += 5;
     totalScore = Math.min(100, totalScore);
 
-    // Get appropriate message
     let message;
     if (totalScore >= 90) {
       message = "Incredible! Master of circles! 🎯✨";
@@ -174,14 +155,12 @@ export default function CircleMaster() {
     const ctx = canvas.getContext('2d');
     const { width, height } = canvasSize;
     
-    // Clear canvas with gradient background
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
     gradient.addColorStop(0, '#667eea');
     gradient.addColorStop(1, '#764ba2');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
     
-    // Draw grid if enabled
     if (showGrid) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
       ctx.lineWidth = 1;
@@ -202,7 +181,6 @@ export default function CircleMaster() {
       }
     }
     
-    // Draw the circle with glow effect
     if (points.length > 1) {
       ctx.shadowColor = '#ffffff';
       ctx.shadowBlur = 6;
@@ -222,7 +200,6 @@ export default function CircleMaster() {
       ctx.shadowBlur = 0;
     }
     
-    // Draw result overlay if exists
     if (result) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
       ctx.fillRect(0, 0, width, height);
@@ -300,11 +277,6 @@ export default function CircleMaster() {
     if (evaluation.score > bestScore) {
       setBestScore(evaluation.score);
     }
-    
-    // Auto-submit good scores onchain if connected
-    if (isConnected && evaluation.score >= 70) {
-      submitScoreOnchain(evaluation.score);
-    }
   };
 
   const handleStart = (e) => {
@@ -329,15 +301,12 @@ export default function CircleMaster() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex flex-col">
-      {/* Header */}
       <div className="flex-shrink-0 text-center py-4 px-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">Circle Master</h1>
         <p className="text-purple-100 text-xs sm:text-sm">A Farcaster Miniapp</p>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 pb-4">
-        {/* Canvas Container */}
         <div 
           ref={containerRef}
           className="relative bg-white/10 backdrop-blur-sm rounded-2xl p-4 shadow-2xl w-full max-w-lg"
@@ -360,7 +329,6 @@ export default function CircleMaster() {
             />
           )}
           
-          {/* Instructions overlay */}
           {points.length === 0 && !result && canvasSize.width > 0 && (
             <div 
               className="absolute inset-4 flex items-center justify-center pointer-events-none rounded-xl"
@@ -380,7 +348,6 @@ export default function CircleMaster() {
           )}
         </div>
         
-        {/* Game Controls */}
         <div className="flex gap-3 mt-4 px-4">
           <button
             onClick={clearCanvas}
@@ -398,49 +365,50 @@ export default function CircleMaster() {
 
         {/* Web3 Section */}
         <div className="web3-section mt-4 text-center max-w-lg w-full px-4">
-          {!isConnected ? (
+          {!walletConnected ? (
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
               <p className="text-white text-sm mb-3">Connect wallet to submit scores onchain!</p>
-              <ConnectButton />
+              <button
+                onClick={handleConnectWallet}
+                disabled={isConnecting}
+                className="px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 text-white rounded-xl transition-colors font-semibold"
+              >
+                {isConnecting ? 'Connecting...' : 'Connect Wallet 🔗'}
+              </button>
             </div>
           ) : (
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 space-y-3">
               <p className="text-white text-sm">
-                Connected: {address?.slice(0,6)}...{address?.slice(-4)}
+                ✅ Connected: {walletAddress?.slice(0,6)}...{walletAddress?.slice(-4)}
               </p>
               
-              {playerStats && playerStats[0] > 0 && (
-                <div className="bg-white/10 rounded-lg p-3 text-white text-sm">
-                  <p>🏆 Onchain Best: {playerStats[0]?.toString()}</p>
-                  <p>🎮 Games Played: {playerStats[1]?.toString()}</p>
+              {result && result.score >= 70 && (
+                <div className="text-center">
+                  <p className="text-green-200 text-sm mb-2">
+                    🎯 Great score! Ready for onchain submission! 🚀
+                  </p>
+                  {CONTRACT_ADDRESS === "0x..." ? (
+                    <p className="text-yellow-200 text-xs">
+                      Deploy your smart contract and update CONTRACT_ADDRESS
+                    </p>
+                  ) : (
+                    <button className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl transition-colors text-sm">
+                      Submit to Leaderboard 🏆
+                    </button>
+                  )}
                 </div>
               )}
               
-              {result && result.score >= 70 && (
-                <button
-                  onClick={() => submitScoreOnchain(result.score)}
-                  disabled={isPending || CONTRACT_ADDRESS === "0x..."}
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 text-white rounded-xl transition-colors text-sm"
-                >
-                  {isPending ? 'Submitting...' : 
-                   CONTRACT_ADDRESS === "0x..." ? 'Deploy Contract First' :
-                   'Submit to Leaderboard 🚀'}
-                </button>
-              )}
-              
-              {CONTRACT_ADDRESS === "0x..." && (
-                <p className="text-yellow-200 text-xs">
-                  Deploy your smart contract and update the CONTRACT_ADDRESS in web3Config.js
-                </p>
-              )}
+              <p className="text-purple-200 text-xs">
+                🔗 Connected to Base Network
+              </p>
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <div className="text-center mt-4 px-4">
           <p className="text-purple-200 text-xs">
-            Made for Farcaster • Share your best score!
+            Made for fun • Share your best score!
           </p>
         </div>
       </div>
