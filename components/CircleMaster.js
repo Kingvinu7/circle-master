@@ -110,10 +110,48 @@ export default function CircleMaster() {
       const provider = new ethers.providers.JsonRpcProvider("https://mainnet.base.org");
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
       
+      console.log("Loading leaderboard from contract:", CONTRACT_ADDRESS);
+      
+      // Get all ScoreSubmitted events
       const filter = contract.filters.ScoreSubmitted();
       const events = await contract.queryFilter(filter, 0, "latest");
       
+      console.log("Found", events.length, "score events");
+      
+      // Process events to build leaderboard
       const playerScores = {};
+      
+      events.forEach(event => {
+        const { player, score } = event.args;
+        const scoreNum = score.toNumber();
+        
+        // Keep only the highest score for each player
+        if (!playerScores[player] || playerScores[player] < scoreNum) {
+          playerScores[player] = scoreNum;
+        }
+      });
+      
+      // Convert to array and sort
+      const leaderboard = Object.entries(playerScores)
+        .map(([address, score]) => ({
+          address,
+          score,
+          shortAddress: `${address.slice(0,6)}...${address.slice(-4)}`
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10)
+        .map((player, index) => ({ ...player, rank: index + 1 }));
+      
+      console.log("Processed leaderboard:", leaderboard);
+      setLeaderboardData(leaderboard);
+      
+    } catch (error) {
+      console.error("Error loading leaderboard:", error);
+      setLeaderboardData([]);
+    } finally {
+      setIsLoadingLeaderboard(false);
+    }
+  };
       events.forEach(event => {
         const { player, score } = event.args;
         const scoreNum = score.toNumber();
