@@ -573,6 +573,15 @@ export default function CircleMaster() {
           >
             {showGrid ? 'Hide Grid' : 'Show Grid'}
           </button>
+          <button
+            onClick={() => {
+              setShowLeaderboard(!showLeaderboard);
+              if (!showLeaderboard) loadLeaderboard();
+            }}
+            className="px-4 sm:px-6 py-2 sm:py-3 bg-yellow-500/80 backdrop-blur-sm text-white border border-yellow-400/30 rounded-xl hover:bg-yellow-500/90 active:bg-yellow-600/90 transition-all duration-200 font-semibold text-sm sm:text-base touch-manipulation"
+          >
+            🏆 Leaderboard
+          </button>
         </div>
 
         {/* Enhanced Web3 Section */}
