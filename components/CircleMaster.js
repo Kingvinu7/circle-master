@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { connectWallet, CONTRACT_ADDRESS } from '../lib/web3Config';
+import confetti from 'canvas-confetti';
+import { connectWallet, CONTRACT_ADDRESS, CONTRACT_ABI } from '../lib/web3Config';
 
 export default function CircleMaster() {
   const canvasRef = useRef(null);
@@ -14,18 +15,156 @@ export default function CircleMaster() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [partyMode, setPartyMode] = useState(false);
 
-  // Connect wallet function
+  // Visual Effects Functions
+  const triggerConfetti = (score) => {
+    if (score >= 100) {
+      // PARTY MODE for perfect 100!
+      setPartyMode(true);
+      
+      // Mega party confetti
+      const duration = 3000;
+      const animationEnd = Date.now() + duration;
+      
+      const interval = setInterval(() => {
+        const timeLeft = animationEnd - Date.now();
+        
+        if (timeLeft <= 0) {
+          setPartyMode(false);
+          return clearInterval(interval);
+        }
+        
+        // Random confetti bursts
+        confetti({
+          particleCount: 50,
+          startVelocity: 30,
+          spread: 360,
+          origin: {
+            x: Math.random(),
+            y: Math.random() - 0.2
+          },
+          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
+        });
+      }, 250);
+      
+      // Extra big burst
+      confetti({
+        particleCount: 200,
+        spread: 160,
+        origin: { y: 0.6 },
+        colors: ['#ffd700', '#ff69b4', '#00ff7f', '#ff6347']
+      });
+      
+    } else if (score >= 90) {
+      // Double confetti for 90-99
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#ffd700', '#ffb347', '#ff69b4']
+      });
+      
+      setTimeout(() => {
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { x: 0.3, y: 0.7 },
+          colors: ['#00ff7f', '#87ceeb', '#dda0dd']
+        });
+      }, 300);
+      
+    } else if (score >= 80) {
+      // Single confetti for 80-89
+      confetti({
+        particleCount: 60,
+        spread: 50,
+        origin: { y: 0.6 },
+        colors: ['#ff6347', '#ffd700', '#98fb98']
+      });
+    }
+  };
+
+  // Get congratulations message with emojis
+  const getCongratulationsMessage = (score) => {
+    if (score >= 100) {
+      return "🎉 PERFECT CIRCLE! ABSOLUTE LEGEND! 🎉";
+    } else if (score >= 90) {
+      return "🔥 AMAZING! Near Perfect Circle! 🔥";
+    } else if (score >= 80) {
+      return "⭐ EXCELLENT! Great Circle Drawing! ⭐";
+    }
+    return "";
+  };
+
+  // Enhanced wallet connection
   const handleConnectWallet = async () => {
     setIsConnecting(true);
     try {
       const address = await connectWallet();
       setWalletConnected(true);
       setWalletAddress(address);
+      
+      // Mini celebration for wallet connection
+      confetti({
+        particleCount: 30,
+        spread: 45,
+        origin: { y: 0.8 },
+        colors: ['#00ff7f', '#87ceeb']
+      });
     } catch (error) {
       alert(error.message);
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  // Submit score to blockchain with signing
+  const submitScoreOnchain = async (score) => {
+    if (!walletConnected || CONTRACT_ADDRESS === "0x...") return;
+    
+    setIsSubmitting(true);
+    try {
+      // Import ethers for contract interaction
+      const { ethers } = await import('ethers');
+      
+      if (!window.ethereum) {
+        throw new Error('No wallet found');
+      }
+      
+      // Create provider and signer
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      
+      // Create contract instance
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      
+      // Submit score (this will trigger wallet signing popup)
+      const tx = await contract.submitScore(score);
+      
+      // Wait for transaction confirmation
+      await tx.wait();
+      
+      // Success celebration
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.7 },
+        colors: ['#00ff00', '#ffd700']
+      });
+      
+      alert(`Score ${score} submitted successfully! 🎉`);
+      
+    } catch (error) {
+      console.error('Error submitting score:', error);
+      if (error.code === 4001) {
+        alert('Transaction cancelled by user');
+      } else {
+        alert('Failed to submit score: ' + error.message);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -146,7 +285,7 @@ export default function CircleMaster() {
 
   useEffect(() => {
     drawCanvas();
-  }, [points, showGrid, result, canvasSize]);
+  }, [points, showGrid, result, canvasSize, partyMode]);
 
   const drawCanvas = () => {
     const canvas = canvasRef.current;
@@ -155,10 +294,21 @@ export default function CircleMaster() {
     const ctx = canvas.getContext('2d');
     const { width, height } = canvasSize;
     
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, '#667eea');
-    gradient.addColorStop(1, '#764ba2');
-    ctx.fillStyle = gradient;
+    // Party mode background
+    if (partyMode) {
+      const gradient = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width/2);
+      const hue = (Date.now() / 50) % 360;
+      gradient.addColorStop(0, `hsl(${hue}, 70%, 50%)`);
+      gradient.addColorStop(1, `hsl(${(hue + 180) % 360}, 70%, 30%)`);
+      ctx.fillStyle = gradient;
+    } else {
+      // Regular gradient background
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, '#667eea');
+      gradient.addColorStop(1, '#764ba2');
+      ctx.fillStyle = gradient;
+    }
+    
     ctx.fillRect(0, 0, width, height);
     
     if (showGrid) {
@@ -211,6 +361,7 @@ export default function CircleMaster() {
       const isMobile = width < 400;
       const scoreFontSize = isMobile ? 48 : 56;
       const messageFontSize = isMobile ? 16 : 20;
+      const congratsFontSize = isMobile ? 14 : 16;
       const statsFontSize = isMobile ? 12 : 14;
       
       ctx.font = `bold ${scoreFontSize}px system-ui, -apple-system, sans-serif`;
@@ -218,16 +369,26 @@ export default function CircleMaster() {
       ctx.textBaseline = 'middle';
       
       const scoreText = `${result.score}/100`;
-      ctx.fillText(scoreText, width / 2, height / 2 - 30);
+      ctx.fillText(scoreText, width / 2, height / 2 - 40);
+      
+      // Congratulations message for high scores
+      const congratsMsg = getCongratulationsMessage(result.score);
+      if (congratsMsg) {
+        ctx.shadowBlur = 10;
+        ctx.font = `bold ${congratsFontSize}px system-ui, -apple-system, sans-serif`;
+        ctx.fillStyle = result.score >= 100 ? '#FFD700' : result.score >= 90 ? '#FF69B4' : '#00FF7F';
+        ctx.fillText(congratsMsg, width / 2, height / 2 - 10);
+        ctx.fillStyle = '#ffffff';
+      }
       
       ctx.shadowBlur = 8;
       ctx.font = `${messageFontSize}px system-ui, -apple-system, sans-serif`;
-      ctx.fillText(result.message, width / 2, height / 2 + 15);
+      ctx.fillText(result.message, width / 2, height / 2 + 20);
       
       ctx.shadowBlur = 4;
       ctx.font = `${statsFontSize}px system-ui, -apple-system, sans-serif`;
       ctx.fillStyle = '#cccccc';
-      ctx.fillText(`Best: ${bestScore} • Attempts: ${attempts}`, width / 2, height / 2 + 45);
+      ctx.fillText(`Best: ${bestScore} • Attempts: ${attempts}`, width / 2, height / 2 + 50);
       
       ctx.shadowBlur = 0;
     }
@@ -259,6 +420,7 @@ export default function CircleMaster() {
     setIsDrawing(true);
     setPoints([pos]);
     setResult(null);
+    setPartyMode(false);
   };
 
   const draw = (pos) => {
@@ -276,6 +438,13 @@ export default function CircleMaster() {
     
     if (evaluation.score > bestScore) {
       setBestScore(evaluation.score);
+    }
+    
+    // Trigger visual effects for high scores
+    if (evaluation.score >= 80) {
+      setTimeout(() => {
+        triggerConfetti(evaluation.score);
+      }, 500);
     }
   };
 
@@ -297,10 +466,11 @@ export default function CircleMaster() {
   const clearCanvas = () => {
     setPoints([]);
     setResult(null);
+    setPartyMode(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex flex-col">
+    <div className={`min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex flex-col ${partyMode ? 'animate-pulse' : ''}`}>
       <div className="flex-shrink-0 text-center py-4 px-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">Circle Master</h1>
         <p className="text-purple-100 text-xs sm:text-sm">A Farcaster Miniapp</p>
@@ -363,7 +533,7 @@ export default function CircleMaster() {
           </button>
         </div>
 
-        {/* Web3 Section */}
+        {/* Enhanced Web3 Section */}
         <div className="web3-section mt-4 text-center max-w-lg w-full px-4">
           {!walletConnected ? (
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
@@ -392,8 +562,12 @@ export default function CircleMaster() {
                       Deploy your smart contract and update CONTRACT_ADDRESS
                     </p>
                   ) : (
-                    <button className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl transition-colors text-sm">
-                      Submit to Leaderboard 🏆
+                    <button 
+                      onClick={() => submitScoreOnchain(result.score)}
+                      disabled={isSubmitting}
+                      className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 text-white rounded-xl transition-colors text-sm"
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Submit to Leaderboard 🏆'}
                     </button>
                   )}
                 </div>
@@ -408,7 +582,7 @@ export default function CircleMaster() {
 
         <div className="text-center mt-4 px-4">
           <p className="text-purple-200 text-xs">
-            Made for fun • Share your best score!
+            Made for Farcaster • Share your best score!
           </p>
         </div>
       </div>
