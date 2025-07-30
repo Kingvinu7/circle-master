@@ -104,25 +104,70 @@ export default function CircleMaster() {
   // Enhanced wallet connection
   // Load leaderboard from events
   const loadLeaderboard = async () => {
-    setIsLoadingLeaderboard(true);
-    try {
-      const { ethers } = await import("ethers");
-      const provider = new ethers.providers.JsonRpcProvider("https://base-rpc.publicnode.com");
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-      
-      console.log("Loading leaderboard from contract:", CONTRACT_ADDRESS);
-      
-      // Get all ScoreSubmitted events
-      const filter = contract.filters.ScoreSubmitted();
-      const events = await contract.queryFilter(filter, 0, "latest");
-      
-      console.log("Found", events.length, "score events");
-      
-      // Process events to build leaderboard
-      const playerScores = {};
-      
 
-  const handleConnectWallet = async () => {
+    setIsLoadingLeaderboard(true);
+
+    try {
+
+      const { ethers } = await import("ethers");
+
+      const provider = new ethers.providers.JsonRpcProvider("https://base-rpc.publicnode.com");
+
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+
+      const filter = contract.filters.ScoreSubmitted();
+
+      const events = await contract.queryFilter(filter, 0, "latest");
+
+      const playerScores = {};
+
+      events.forEach(event => {
+
+        const { player, score } = event.args;
+
+        const scoreNum = score.toNumber();
+
+        if (!playerScores[player] || playerScores[player] < scoreNum) {
+
+          playerScores[player] = scoreNum;
+
+        }
+
+      });
+
+      const leaderboard = Object.entries(playerScores)
+
+        .map(([address, score]) => ({
+
+          address,
+
+          score,
+
+          shortAddress: `${address.slice(0,6)}...${address.slice(-4)}`
+
+        }))
+
+        .sort((a, b) => b.score - a.score)
+
+        .slice(0, 10)
+
+        .map((player, index) => ({ ...player, rank: index + 1 }));
+
+      setLeaderboardData(leaderboard);
+
+    } catch (error) {
+
+      console.error("Error loading leaderboard:", error);
+
+      setLeaderboardData([]);
+
+    } finally {
+
+      setIsLoadingLeaderboard(false);
+
+    }
+
+  };
     setIsConnecting(true);
     try {
       const address = await connectWallet();
