@@ -26,123 +26,20 @@ export default function CircleMaster() {
   const loadLeaderboard = async () => {
     setIsLoadingLeaderboard(true);
     try {
-      const { ethers } = await import("ethers");
-      
-      // Use more reliable RPC endpoints
-      const rpcEndpoints = [
-        "https://base.drpc.org",
-        "https://rpc.ankr.com/base",
-        "https://base.llamarpc.com"
-      ];
-      
-      let provider = null;
-      for (const rpcUrl of rpcEndpoints) {
-        try {
-          provider = new ethers.providers.JsonRpcProvider(rpcUrl);
-          const blockNum = await provider.getBlockNumber();
-          console.log(`Connected to ${rpcUrl}, block: ${blockNum}`);
-          break;
-        } catch (err) {
-          console.log(`RPC ${rpcUrl} failed:`, err.message);
-          continue;
-        }
-      }
-      
-      if (!provider) {
-        console.log("All RPC endpoints failed, showing test data");
-        const testData = [
-          { address: "0x1234...5678", score: 95, shortAddress: "0x1234...5678", rank: 1 },
-          { address: "0x2345...6789", score: 87, shortAddress: "0x2345...6789", rank: 2 },
-          { address: "0x3456...7890", score: 76, shortAddress: "0x3456...7890", rank: 3 }
-        ];
-        setLeaderboardData(testData);
-        return;
-      }
-      
+      const { ethers } = await import('ethers');
+      const provider = new ethers.providers.JsonRpcProvider('https://base-rpc.publicnode.com');
       const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
       
-      // Try direct contract call instead of events
-      console.log("Calling getTopPlayers function...");
-      const [addresses, scores] = await contract.getTopPlayers(10);
+      console.log('Loading leaderboard from contract:', CONTRACT_ADDRESS);
       
-      console.log("Raw contract data:", { addresses, scores });
+      // Get all ScoreSubmitted events
+      const filter = contract.filters.ScoreSubmitted();
+      const events = await contract.queryFilter(filter, 0, 'latest');
       
-      // Process contract response
-      const leaderboard = addresses
-        .map((address, index) => {
-          const score = scores[index].toNumber();
-          return {
-            address,
-            score,
-            shortAddress: `${address.slice(0,6)}...${address.slice(-4)}`,
-            rank: index + 1
-          };
-        })
-        .filter(player => player.score > 0);
+      console.log('Found', events.length, 'score events');
       
-      console.log("Processed leaderboard:", leaderboard);
-      
-      if (leaderboard.length === 0) {
-        console.log("No scores in contract, showing test data");
-        const testData = [
-          { address: "0x1234...5678", score: 95, shortAddress: "0x1234...5678", rank: 1 },
-          { address: "0x2345...6789", score: 87, shortAddress: "0x2345...6789", rank: 2 },
-          { address: "0x3456...7890", score: 76, shortAddress: "0x3456...7890", rank: 3 }
-        ];
-        setLeaderboardData(testData);
-      } else {
-        setLeaderboardData(leaderboard);
-      }
-      
-    } catch (error) {
-      console.error("Direct contract call failed:", error);
-      
-      // Ultimate fallback - always show test data
-      console.log("Using fallback test data");
-      const testData = [
-        { address: "0x1234...5678", score: 95, shortAddress: "0x1234...5678", rank: 1 },
-        { address: "0x2345...6789", score: 87, shortAddress: "0x2345...6789", rank: 2 },
-        { address: "0x3456...7890", score: 76, shortAddress: "0x3456...7890", rank: 3 }
-      ];
-      setLeaderboardData(testData);
-    } finally {
-      setIsLoadingLeaderboard(false);
-    }
-  };
-      allEvents.forEach(event => {
-        try {
-          const { player, score } = event.args;
-          const scoreNum = score.toNumber();
-          if (!playerScores[player] || playerScores[player] < scoreNum) {
-            playerScores[player] = scoreNum;
-          }
-        } catch (eventError) {
-          console.warn("Error processing event:", eventError);
-        }
-      });
-      
-      // Build sorted leaderboard
-      const leaderboard = Object.entries(playerScores)
-        .map(([address, score]) => ({
-          address,
-          score,
-          shortAddress: `${address.slice(0,6)}...${address.slice(-4)}`
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10)
-        .map((player, index) => ({ ...player, rank: index + 1 }));
-      
-      console.log("Final leaderboard:", leaderboard);
-      setLeaderboardData(leaderboard);
-      
-    } catch (error) {
-      console.error("Leaderboard loading failed:", error);
-      // Fallback to empty state with helpful message
-      setLeaderboardData([]);
-    } finally {
-      setIsLoadingLeaderboard(false);
-    }
-  };
+      // Process events to build leaderboard
+      const playerScores = {};
       
       events.forEach(event => {
         const { player, score } = event.args;
